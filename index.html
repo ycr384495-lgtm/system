@@ -1,0 +1,1268 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=0.5">
+    <title>道路积水安全预警系统</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts-gl@2/dist/echarts-gl.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Microsoft YaHei', 'Segoe UI', sans-serif;
+        }
+        
+        body {
+            background-color: #0a0e17;
+            color: #e6edf3;
+            min-height: 100vh;
+            overflow-x: hidden;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(28, 58, 173, 0.15) 0%, transparent 20%),
+                radial-gradient(circle at 90% 80%, rgba(56, 189, 248, 0.15) 0%, transparent 20%),
+                linear-gradient(to bottom, rgba(10, 14, 23, 0.9), rgba(10, 14, 23, 0.9)),
+                url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" fill="none"/><path d="M0,0 L100,100" stroke="rgba(88, 166, 255, 0.05)" stroke-width="0.5"/><path d="M0,100 L100,0" stroke="rgba(88, 166, 255, 0.05)" stroke-width="0.5"/><path d="M50,0 L50,100" stroke="rgba(88, 166, 255, 0.05)" stroke-width="0.5"/><path d="M0,50 L100,50" stroke="rgba(88, 166, 255, 0.05)" stroke-width="0.5"/></svg>');
+            position: relative;
+        }
+        
+        /* 科技感光效背景 */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 20% 30%, rgba(88, 166, 255, 0.15) 0%, transparent 40%),
+                radial-gradient(circle at 80% 70%, rgba(126, 231, 135, 0.1) 0%, transparent 40%);
+            pointer-events: none;
+            z-index: -1;
+        }
+        
+        /* 动态光效 */
+        .light-effect {
+            position: fixed;
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(88, 166, 255, 0.2) 0%, rgba(88, 166, 255, 0) 70%);
+            border-radius: 50%;
+            filter: blur(60px);
+            z-index: -2;
+            animation: moveLight 20s infinite alternate ease-in-out;
+        }
+        
+        .light-effect:nth-child(1) {
+            top: -200px;
+            left: -200px;
+            animation-delay: 0s;
+        }
+        
+        .light-effect:nth-child(2) {
+            bottom: -200px;
+            right: -200px;
+            animation-delay: 5s;
+            background: radial-gradient(circle, rgba(126, 231, 135, 0.15) 0%, rgba(126, 231, 135, 0) 70%);
+        }
+        
+        @keyframes moveLight {
+            0% {
+                transform: translate(0, 0);
+            }
+            100% {
+                transform: translate(100px, 100px);
+            }
+        }
+        
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1.5fr 1fr;
+            grid-template-rows: auto 1fr;
+            gap: 20px;
+            padding: 20px;
+            height: 100vh;
+            position: relative;
+            z-index: 1;
+        }
+        
+        /* 标题区域 - 修改：减小字号并居中 */
+        .header {
+            grid-column: 1 / span 3;
+            background: rgba(13, 17, 23, 0.7);
+            border-radius: 20px;
+            padding: 20px 40px; /* 减小上下内边距 */
+            border: 1px solid rgba(88, 166, 255, 0.3);
+            box-shadow: 
+                0 10px 30px rgba(0, 0, 0, 0.5),
+                0 0 40px rgba(88, 166, 255, 0.1),
+                inset 0 0 20px rgba(88, 166, 255, 0.05);
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 10px;
+            backdrop-filter: blur(10px);
+            border-top: 1px solid rgba(126, 231, 135, 0.2);
+            display: flex; /* 新增：使用flex布局 */
+            align-items: center; /* 新增：垂直居中 */
+            justify-content: center; /* 新增：水平居中 */
+        }
+        
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #1f6feb, #58a6ff, #7ee787, #1f6feb);
+            background-size: 200% 100%;
+            animation: shimmer 3s infinite linear;
+        }
+        
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+        
+        .header h1 {
+            font-size: 1.8rem; /* 进一步减小字号 */
+            font-weight: 800;
+            background: linear-gradient(90deg, #58a6ff, #7ee787);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            text-shadow: 0 0 30px rgba(88, 166, 255, 0.5);
+            letter-spacing: 0.5px;
+            line-height: 1.2;
+            text-align: center; /* 确保文本居中 */
+            width: 100%; /* 确保宽度100% */
+        }
+        
+        /* 左侧面板 */
+        .left-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .panel {
+            background: rgba(22, 27, 34, 0.7);
+            border-radius: 20px;
+            padding: 25px;
+            border: 1px solid rgba(88, 166, 255, 0.3);
+            box-shadow: 
+                0 10px 30px rgba(0, 0, 0, 0.4),
+                0 0 20px rgba(88, 166, 255, 0.1);
+            position: relative;
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .panel:hover {
+            transform: translateY(-5px);
+            box-shadow: 
+                0 15px 40px rgba(0, 0, 0, 0.5),
+                0 0 30px rgba(88, 166, 255, 0.2);
+        }
+        
+        .panel::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(88, 166, 255, 0.5), transparent);
+        }
+        
+        .panel-title {
+            font-size: 1.4rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #58a6ff;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-shadow: 0 0 10px rgba(88, 166, 255, 0.5);
+        }
+        
+        .panel-title i {
+            font-size: 1.6rem;
+        }
+        
+        /* 车辆实时速度 */
+        .speed-display {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 200px;
+        }
+        
+        .speed-value {
+            font-size: 5rem;
+            font-weight: 800;
+            background: linear-gradient(90deg, #58a6ff, #7ee787);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            line-height: 1;
+            text-shadow: 0 0 30px rgba(88, 166, 255, 0.5);
+            position: relative;
+        }
+        
+        .speed-value::after {
+            content: '';
+            position: absolute;
+            bottom: -5px;
+            left: 10%;
+            right: 10%;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, #58a6ff, #7ee787, transparent);
+            border-radius: 3px;
+        }
+        
+        .speed-unit {
+            font-size: 1.5rem;
+            color: #8b949e;
+            margin-top: 5px;
+            letter-spacing: 1px;
+        }
+        
+        .speed-label {
+            font-size: 1.2rem;
+            color: #c9d1d9;
+            margin-top: 15px;
+        }
+        
+        .speed-status {
+            display: inline-block;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-top: 15px;
+            border: 1px solid;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+        }
+        
+        .status-safe {
+            background-color: rgba(46, 160, 67, 0.2);
+            color: #7ee787;
+            border-color: #238636;
+            text-shadow: 0 0 10px rgba(126, 231, 135, 0.5);
+        }
+        
+        .status-warning {
+            background-color: rgba(187, 128, 9, 0.2);
+            color: #e3b341;
+            border-color: #bb8009;
+            text-shadow: 0 0 10px rgba(227, 179, 65, 0.5);
+        }
+        
+        .status-danger {
+            background-color: rgba(248, 81, 73, 0.2);
+            color: #f85149;
+            border-color: #da3633;
+            text-shadow: 0 0 10px rgba(248, 81, 73, 0.5);
+        }
+        
+        /* 图像容器 */
+        .image-container {
+            height: 350px;
+            overflow: hidden;
+            border-radius: 15px;
+            border: 1px solid rgba(88, 166, 255, 0.3);
+            position: relative;
+            background: rgba(13, 17, 23, 0.5);
+        }
+        
+        .image-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.5s ease;
+        }
+        
+        .image-container:hover img {
+            transform: scale(1.05);
+        }
+        
+        .image-label {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(13, 17, 23, 0.9);
+            padding: 12px 15px;
+            font-size: 0.9rem;
+            color: #c9d1d9;
+            border-top: 1px solid rgba(88, 166, 255, 0.3);
+            backdrop-filter: blur(5px);
+        }
+        
+        /* 中间状态面板 - 修改：去掉小标题并调整布局 */
+        .center-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .status-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding-top: 20px; /* 增加上内边距，因为去掉了标题 */
+        }
+        
+        .status-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            padding: 10px 0;
+        }
+        
+        .status-main {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 30px;
+            margin-bottom: 20px;
+        }
+        
+        .status-indicator {
+            width: 140px;
+            height: 140px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3rem;
+            font-weight: 800;
+            box-shadow: 
+                0 0 30px rgba(0, 0, 0, 0.5),
+                inset 0 0 20px rgba(255, 255, 255, 0.1);
+            position: relative;
+        }
+        
+        .status-indicator::before {
+            content: '';
+            position: absolute;
+            top: -5px;
+            left: -5px;
+            right: -5px;
+            bottom: -5px;
+            border-radius: 50%;
+            z-index: -1;
+            filter: blur(10px);
+        }
+        
+        .indicator-safe {
+            background: linear-gradient(135deg, rgba(46, 160, 67, 0.2) 0%, rgba(35, 134, 54, 0.2) 100%);
+            color: #7ee787;
+            border: 3px solid #238636;
+        }
+        
+        .indicator-safe::before {
+            background: rgba(46, 160, 67, 0.2);
+        }
+        
+        .indicator-warning {
+            background: linear-gradient(135deg, rgba(187, 128, 9, 0.2) 0%, rgba(187, 128, 9, 0.2) 100%);
+            color: #e3b341;
+            border: 3px solid #bb8009;
+        }
+        
+        .indicator-warning::before {
+            background: rgba(187, 128, 9, 0.2);
+        }
+        
+        .indicator-danger {
+            background: linear-gradient(135deg, rgba(248, 81, 73, 0.2) 0%, rgba(218, 54, 51, 0.2) 100%);
+            color: #f85149;
+            border: 3px solid #da3633;
+            animation: pulse 2s infinite;
+        }
+        
+        .indicator-danger::before {
+            background: rgba(248, 81, 73, 0.2);
+        }
+        
+        @keyframes pulse {
+            0% { 
+                box-shadow: 
+                    0 0 0 0 rgba(248, 81, 73, 0.7),
+                    inset 0 0 20px rgba(255, 255, 255, 0.1);
+            }
+            70% { 
+                box-shadow: 
+                    0 0 0 20px rgba(248, 81, 73, 0),
+                    inset 0 0 20px rgba(255, 255, 255, 0.1);
+            }
+            100% { 
+                box-shadow: 
+                    0 0 0 0 rgba(248, 81, 73, 0),
+                    inset 0 0 20px rgba(255, 255, 255, 0.1);
+            }
+        }
+        
+        .status-text {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        
+        .status-title {
+            font-size: 2.2rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            text-shadow: 0 0 10px rgba(88, 166, 255, 0.5);
+        }
+        
+        .status-subtitle {
+            font-size: 1.2rem;
+            color: #8b949e;
+            margin-bottom: 15px;
+            line-height: 1.5;
+        }
+        
+        .status-details {
+            background-color: rgba(22, 27, 34, 0.5);
+            border-radius: 15px;
+            padding: 15px;
+            border: 1px solid rgba(88, 166, 255, 0.2);
+            margin-top: 15px;
+            backdrop-filter: blur(5px);
+        }
+        
+        .detail-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(88, 166, 255, 0.1);
+        }
+        
+        .detail-item:last-child {
+            border-bottom: none;
+        }
+        
+        .detail-label {
+            color: #8b949e;
+        }
+        
+        .detail-value {
+            font-weight: 600;
+            color: #c9d1d9;
+        }
+        
+        /* 右侧面板 */
+        .right-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .safety-speed {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 200px;
+        }
+        
+        .safety-value {
+            font-size: 4.5rem;
+            font-weight: 800;
+            background: linear-gradient(90deg, #58a6ff, #7ee787);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            line-height: 1;
+            text-shadow: 0 0 30px rgba(88, 166, 255, 0.5);
+            position: relative;
+        }
+        
+        .safety-value::after {
+            content: '';
+            position: absolute;
+            bottom: -5px;
+            left: 10%;
+            right: 10%;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, #58a6ff, #7ee787, transparent);
+            border-radius: 3px;
+        }
+        
+        .safety-label {
+            font-size: 1.8rem;
+            color: #8b949e;
+            margin-top: 10px;
+            text-align: center;
+        }
+        
+        .safety-desc {
+            font-size: 0.9rem;
+            color: #8b949e;
+            margin-top: 15px;
+            text-align: center;
+            line-height: 1.5;
+        }
+        
+        /* 控制面板 */
+        .control-panel {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(88, 166, 255, 0.2);
+        }
+        
+        .control-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #58a6ff;
+            text-shadow: 0 0 10px rgba(88, 166, 255, 0.5);
+        }
+        
+        .control-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        
+        .control-btn {
+            padding: 12px;
+            border-radius: 12px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .control-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+            transition: left 0.5s ease;
+        }
+        
+        .control-btn:hover::before {
+            left: 100%;
+        }
+        
+        .control-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #1f6feb 0%, #58a6ff 100%);
+            color: white;
+        }
+        
+        .btn-secondary {
+            background: rgba(88, 166, 255, 0.15);
+            color: #58a6ff;
+            border: 1px solid rgba(88, 166, 255, 0.3);
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, #238636 0%, #2ea043 100%);
+            color: white;
+        }
+        
+        .btn-warning {
+            background: linear-gradient(135deg, #bb8009 0%, #e3b341 100%);
+            color: white;
+        }
+        
+        .btn-danger {
+            background: linear-gradient(135deg, #da3633 0%, #f85149 100%);
+            color: white;
+        }
+        
+        /* 系统日志 */
+        .log-panel {
+            margin-top: 10px;
+            max-height: 150px;
+            overflow-y: auto;
+            border-radius: 10px;
+            border: 1px solid rgba(88, 166, 255, 0.2);
+            background: rgba(13, 17, 23, 0.5);
+            padding: 12px;
+        }
+        
+        .log-item {
+            padding: 10px 12px;
+            border-bottom: 1px solid rgba(88, 166, 255, 0.1);
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .log-item:last-child {
+            border-bottom: none;
+        }
+        
+        .log-time {
+            color: #8b949e;
+            min-width: 75px;
+            font-weight: 500;
+        }
+        
+        .log-info {
+            color: #58a6ff;
+        }
+        
+        .log-warning {
+            color: #e3b341;
+        }
+        
+        .log-danger {
+            color: #f85149;
+        }
+        
+        /* 响应式设计 */
+        @media (max-width: 1400px) {
+            .container {
+                grid-template-columns: 1fr 1fr;
+                grid-template-rows: auto 1fr 1fr;
+            }
+            
+            .header {
+                grid-column: 1 / span 2;
+            }
+            
+            .center-panel {
+                grid-column: 1 / span 2;
+                grid-row: 2;
+            }
+            
+            .left-panel, .right-panel {
+                grid-row: 3;
+            }
+        }
+        
+        @media (max-width: 900px) {
+            .container {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto;
+            }
+            
+            .header {
+                grid-column: 1;
+                padding: 15px 20px; /* 移动端进一步减小内边距 */
+            }
+            
+            .header h1 {
+                font-size: 1.5rem; /* 移动端进一步减小标题字号 */
+            }
+            
+            .left-panel, .center-panel, .right-panel {
+                grid-column: 1;
+                grid-row: auto;
+            }
+            
+            .speed-value, .safety-value {
+                font-size: 3.5rem;
+            }
+            
+            .status-indicator {
+                width: 100px;
+                height: 100px;
+                font-size: 2rem;
+            }
+            
+            .status-title {
+                font-size: 1.8rem;
+            }
+            
+            .log-item {
+                font-size: 0.95rem;
+            }
+        }
+        
+        /* 数据更新动画 */
+        .data-update {
+            animation: highlight 1s ease;
+        }
+        
+        @keyframes highlight {
+            0% { background-color: rgba(88, 166, 255, 0); }
+            50% { background-color: rgba(88, 166, 255, 0.2); }
+            100% { background-color: rgba(88, 166, 255, 0); }
+        }
+        
+        /* 水位指示器 */
+        .water-level {
+            display: flex;
+            align-items: center;
+            margin-top: 15px;
+        }
+        
+        .water-bar {
+            flex: 1;
+            height: 12px;
+            background-color: rgba(48, 54, 61, 0.5);
+            border-radius: 6px;
+            overflow: hidden;
+            margin-right: 10px;
+            border: 1px solid rgba(88, 166, 255, 0.2);
+        }
+        
+        .water-fill {
+            height: 100%;
+            border-radius: 6px;
+            background: linear-gradient(90deg, #1f6feb, #58a6ff);
+            transition: width 1s ease;
+            box-shadow: 0 0 10px rgba(31, 111, 235, 0.5);
+        }
+        
+        .water-value {
+            font-weight: 600;
+            min-width: 70px;
+            text-align: right;
+        }
+        
+        /* 滚动条样式 */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: rgba(22, 27, 34, 0.5);
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: rgba(88, 166, 255, 0.3);
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(88, 166, 255, 0.5);
+        }
+        
+        /* 连接线效果 */
+        .connection-line {
+            position: absolute;
+            background: rgba(88, 166, 255, 0.1);
+            z-index: -1;
+            border-radius: 2px;
+        }
+        
+        .connection-line.horizontal {
+            height: 2px;
+            width: 100px;
+        }
+        
+        .connection-line.vertical {
+            width: 2px;
+            height: 100px;
+        }
+    </style>
+</head>
+<body>
+    <!-- 动态光效 -->
+    <div class="light-effect"></div>
+    <div class="light-effect"></div>
+    
+    <div class="container">
+        <!-- 标题区域 -->
+        <div class="header">
+            <h1><i class="fas fa-road"></i> 道路积水安全预警系统</h1>
+        </div>
+        
+        <!-- 左侧面板 -->
+        <div class="left-panel">
+            <!-- 车辆实时速度 -->
+            <div class="panel">
+                <div class="panel-title">
+                    <i class="fas fa-tachometer-alt"></i> 车辆实时速度
+                </div>
+                <div class="speed-display">
+                    <div class="speed-value" id="currentSpeed">60</div>
+                    <div class="speed-unit">km/h</div>
+                    <div class="speed-label">当前行驶速度</div>
+                    <div class="speed-status status-safe" id="speedStatus">安全速度范围内</div>
+                </div>
+                
+                <div class="control-panel">
+                    <div class="control-title">速度控制</div>
+                    <div class="control-buttons">
+                        <button class="control-btn btn-primary" onclick="adjustSpeed(5)">
+                            <i class="fas fa-plus"></i> 加速
+                        </button>
+                        <button class="control-btn btn-secondary" onclick="adjustSpeed(-5)">
+                            <i class="fas fa-minus"></i> 减速
+                        </button>
+                        <button class="control-btn btn-success" onclick="setAutoSpeed()">
+                            <i class="fas fa-robot"></i> 自动调速
+                        </button>
+                        <button class="control-btn btn-danger" onclick="emergencyStop()">
+                            <i class="fas fa-exclamation-triangle"></i> 紧急制动
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 坑槽3D视图 -->
+            <div class="panel">
+                <div class="panel-title">
+                    <i class="fas fa-chart-area"></i> 坑槽地形三维分析
+                </div>
+                <div class="image-container">
+                    <!-- 修改为相对路径：image/pic1.png -->
+                    <img src="image/pic1.png" alt="坑槽数据插值三维图" id="terrainImage" onerror="handleImageError(this, 'terrain')">
+                    <div class="image-label">基于MATLAB插值算法的坑槽地形三维重建</div>
+                </div>
+                
+                <div class="water-level">
+                    <div class="water-bar">
+                        <div class="water-fill" id="waterFill" style="width: 30%;"></div>
+                    </div>
+                    <div class="water-value" id="waterDepth">15.2 mm</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 中间状态面板 - 修改：去掉了小标题 -->
+        <div class="center-panel">
+            <div class="panel status-panel">
+                <!-- 注意：这里移除了panel-title，即去掉了"系统状态面板"小标题 -->
+                <div class="status-content">
+                    <div class="status-main">
+                        <div class="status-indicator indicator-safe" id="statusIndicator">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                        <div class="status-text">
+                            <div class="status-title" id="statusTitle">系统运行正常</div>
+                            <div class="status-subtitle" id="statusSubtitle">当前车速在安全范围内，可正常通行</div>
+                        </div>
+                    </div>
+                    
+                    <div class="status-details">
+                        <div class="detail-item">
+                            <span class="detail-label">坑槽编号</span>
+                            <span class="detail-value" id="potholeId">P-002</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">检测时间</span>
+                            <span class="detail-value" id="detectionTime">2023-10-15 14:30:22</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">积水深度</span>
+                            <span class="detail-value" id="waterDepthDetail">15.2 mm</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">路面类型</span>
+                            <span class="detail-value" id="roadType">普通柏油路面</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">轮胎状态</span>
+                            <span class="detail-value" id="tireStatus">良好 (花纹深度 5.2mm)</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="log-panel" id="systemLog">
+                    <div class="log-item">
+                        <span class="log-time">14:30:22</span>
+                        <span class="log-info">系统初始化完成，开始实时监测</span>
+                    </div>
+                    <div class="log-item">
+                        <span class="log-time">14:31:05</span>
+                        <span class="log-info">检测到坑槽 P-002，深度 15.2mm</span>
+                    </div>
+                    <div class="log-item">
+                        <span class="log-time">14:31:10</span>
+                        <span class="log-info">安全速度计算完成：最高安全速度 85 km/h</span>
+                    </div>
+                    <div class="log-item">
+                        <span class="log-time">14:32:45</span>
+                        <span class="log-info">车辆速度 60 km/h，处于安全范围内</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 右侧面板 -->
+        <div class="right-panel">
+            <!-- 最高安全速度 -->
+            <div class="panel">
+                <div class="panel-title">
+                    <i class="fas fa-shield-alt"></i> 最高安全速度
+                </div>
+                <div class="safety-speed">
+                    <div class="safety-value" id="maxSafeSpeed">85</div>
+                    <div class="speed-unit">km/h</div>
+                    <div class="safety-label">推荐最高安全车速</div>
+                    <div class="safety-desc">基于MATLAB安全速度计算模型，综合考虑积水深度、路面类型、轮胎状态等因素</div>
+                </div>
+                
+                <div class="control-panel">
+                    <div class="control-title">安全设置</div>
+                    <div class="control-buttons">
+                        <button class="control-btn btn-primary" onclick="updateSafetyData()">
+                            <i class="fas fa-sync-alt"></i> 更新数据
+                        </button>
+                        <button class="control-btn btn-secondary" onclick="showDetails()">
+                            <i class="fas fa-info-circle"></i> 详细报告
+                        </button>
+                        <button class="control-btn btn-success" onclick="exportReport()">
+                            <i class="fas fa-download"></i> 导出报告
+                        </button>
+                        <button class="control-btn btn-warning" onclick="toggleAlerts()">
+                            <i class="fas fa-bell"></i> 警报设置
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 完全积水平面示意图 -->
+            <div class="panel">
+                <div class="panel-title">
+                    <i class="fas fa-water"></i> 坑槽积水模拟分析
+                </div>
+                <div class="image-container">
+                    <!-- 修改为相对路径：image/pic2.png -->
+                    <img src="image/pic2.png" alt="坑槽3D视图和不同积水水面" id="potholeImage" onerror="handleImageError(this, 'pothole')">
+                    <div class="image-label">MATLAB坑槽3D视图与不同积水水面模拟 (20%/60%/100%)</div>
+                </div>
+                
+                <div class="water-level">
+                    <div class="water-bar">
+                        <div class="water-fill" id="simulationFill" style="width: 60%;"></div>
+                    </div>
+                    <div class="water-value" id="simulationLevel">中度积水 (60%)</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 系统状态数据
+        const systemData = {
+            currentSpeed: 60,
+            maxSafeSpeed: 85,
+            waterDepth: 15.2,
+            potholeId: 'P-002',
+            roadType: '普通柏油路面',
+            tireStatus: '良好 (花纹深度 5.2mm)',
+            systemStatus: 'safe', // safe, warning, danger
+            simulationLevel: 60 // 积水模拟百分比
+        };
+        
+        // 图片加载错误处理
+        function handleImageError(img, type) {
+            console.log(`图片加载失败: ${img.src}`);
+            
+            // 创建替代内容
+            const container = img.parentElement;
+            img.style.display = 'none';
+            
+            const placeholder = document.createElement('div');
+            placeholder.style.width = '100%';
+            placeholder.style.height = '100%';
+            placeholder.style.display = 'flex';
+            placeholder.style.flexDirection = 'column';
+            placeholder.style.alignItems = 'center';
+            placeholder.style.justifyContent = 'center';
+            placeholder.style.color = '#8b949e';
+            placeholder.style.background = 'rgba(13, 17, 23, 0.7)';
+            placeholder.style.padding = '20px';
+            placeholder.style.textAlign = 'center';
+            
+            if (type === 'terrain') {
+                placeholder.innerHTML = `
+                    <i class="fas fa-chart-area" style="font-size: 3rem; margin-bottom: 15px; color: #58a6ff;"></i>
+                    <div style="font-size: 1.2rem; margin-bottom: 10px; color: #58a6ff;">坑槽地形三维分析图</div>
+                    <div style="font-size: 0.9rem; margin-bottom: 10px;">图片加载失败，请检查文件路径</div>
+                    <div style="font-size: 0.8rem; color: #8b949e;">预期路径: image/pic1.png</div>
+                    <div style="font-size: 0.8rem; color: #8b949e; margin-top: 5px;">基于MATLAB插值算法生成的坑槽地形三维重建图</div>
+                `;
+            } else {
+                placeholder.innerHTML = `
+                    <i class="fas fa-water" style="font-size: 3rem; margin-bottom: 15px; color: #58a6ff;"></i>
+                    <div style="font-size: 1.2rem; margin-bottom: 10px; color: #58a6ff;">坑槽积水模拟分析图</div>
+                    <div style="font-size: 0.9rem; margin-bottom: 10px;">图片加载失败，请检查文件路径</div>
+                    <div style="font-size: 0.8rem; color: #8b949e;">预期路径: image/pic2.png</div>
+                    <div style="font-size: 0.8rem; color: #8b949e; margin-top: 5px;">MATLAB坑槽3D视图与不同积水水面模拟 (20%/60%/100%)</div>
+                `;
+            }
+            
+            container.appendChild(placeholder);
+        }
+        
+        // 初始化页面
+        document.addEventListener('DOMContentLoaded', function() {
+            updateDisplay();
+            startDataSimulation();
+            updateTime();
+            
+            // 每5秒更新一次时间
+            setInterval(updateTime, 5000);
+        });
+        
+        // 更新时间
+        function updateTime() {
+            const now = new Date();
+            const timeString = `${now.getFullYear()}-${(now.getMonth()+1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+            document.getElementById('detectionTime').textContent = timeString;
+        }
+        
+        // 更新显示
+        function updateDisplay() {
+            // 更新当前速度
+            document.getElementById('currentSpeed').textContent = systemData.currentSpeed;
+            
+            // 更新最高安全速度
+            document.getElementById('maxSafeSpeed').textContent = systemData.maxSafeSpeed;
+            
+            // 更新水深
+            document.getElementById('waterDepth').textContent = systemData.waterDepth.toFixed(1) + ' mm';
+            document.getElementById('waterDepthDetail').textContent = systemData.waterDepth.toFixed(1) + ' mm';
+            
+            // 更新水位指示器
+            const waterPercentage = Math.min(systemData.waterDepth / 50 * 100, 100);
+            document.getElementById('waterFill').style.width = waterPercentage + '%';
+            
+            // 更新模拟水位
+            document.getElementById('simulationFill').style.width = systemData.simulationLevel + '%';
+            let simulationText = '';
+            if (systemData.simulationLevel <= 20) {
+                simulationText = '轻微积水 (' + systemData.simulationLevel + '%)';
+            } else if (systemData.simulationLevel <= 60) {
+                simulationText = '中度积水 (' + systemData.simulationLevel + '%)';
+            } else {
+                simulationText = '严重积水 (' + systemData.simulationLevel + '%)';
+            }
+            document.getElementById('simulationLevel').textContent = simulationText;
+            
+            // 更新状态指示器
+            updateStatusIndicator();
+            
+            // 添加数据更新动画
+            document.getElementById('currentSpeed').classList.add('data-update');
+            document.getElementById('maxSafeSpeed').classList.add('data-update');
+            
+            setTimeout(() => {
+                document.getElementById('currentSpeed').classList.remove('data-update');
+                document.getElementById('maxSafeSpeed').classList.remove('data-update');
+            }, 1000);
+        }
+        
+        // 更新状态指示器
+        function updateStatusIndicator() {
+            const statusIndicator = document.getElementById('statusIndicator');
+            const statusTitle = document.getElementById('statusTitle');
+            const statusSubtitle = document.getElementById('statusSubtitle');
+            const speedStatus = document.getElementById('speedStatus');
+            
+            // 计算速度安全比例
+            const speedRatio = systemData.currentSpeed / systemData.maxSafeSpeed;
+            
+            if (systemData.currentSpeed === 0) {
+                // 停车状态
+                systemData.systemStatus = 'safe';
+                statusIndicator.className = 'status-indicator indicator-safe';
+                statusIndicator.innerHTML = '<i class="fas fa-parking"></i>';
+                statusTitle.textContent = '车辆已停车';
+                statusSubtitle.textContent = '车辆处于停止状态，安全风险低';
+                speedStatus.textContent = '车辆已停车';
+                speedStatus.className = 'speed-status status-safe';
+            } else if (speedRatio <= 0.8) {
+                // 安全状态
+                systemData.systemStatus = 'safe';
+                statusIndicator.className = 'status-indicator indicator-safe';
+                statusIndicator.innerHTML = '<i class="fas fa-check-circle"></i>';
+                statusTitle.textContent = '系统运行正常';
+                statusSubtitle.textContent = `当前车速${systemData.currentSpeed} km/h，低于安全阈值${systemData.maxSafeSpeed} km/h`;
+                speedStatus.textContent = '安全速度范围内';
+                speedStatus.className = 'speed-status status-safe';
+            } else if (speedRatio <= 1.0) {
+                // 警告状态
+                systemData.systemStatus = 'warning';
+                statusIndicator.className = 'status-indicator indicator-warning';
+                statusIndicator.innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
+                statusTitle.textContent = '速度接近阈值';
+                statusSubtitle.textContent = `当前车速${systemData.currentSpeed} km/h，接近安全阈值${systemData.maxSafeSpeed} km/h`;
+                speedStatus.textContent = '接近安全阈值';
+                speedStatus.className = 'speed-status status-warning';
+            } else {
+                // 危险状态
+                systemData.systemStatus = 'danger';
+                statusIndicator.className = 'status-indicator indicator-danger';
+                statusIndicator.innerHTML = '<i class="fas fa-exclamation-circle"></i>';
+                statusTitle.textContent = '速度超过安全阈值！';
+                statusSubtitle.textContent = `当前车速${systemData.currentSpeed} km/h，已超过安全阈值${systemData.maxSafeSpeed} km/h`;
+                speedStatus.textContent = '超过安全阈值！';
+                speedStatus.className = 'speed-status status-danger';
+                
+                // 添加到系统日志
+                addLogItem('danger', `警告：车速${systemData.currentSpeed} km/h超过安全阈值${systemData.maxSafeSpeed} km/h`);
+            }
+        }
+        
+        // 调整速度
+        function adjustSpeed(change) {
+            const newSpeed = systemData.currentSpeed + change;
+            
+            // 限制速度范围
+            if (newSpeed < 0) {
+                systemData.currentSpeed = 0;
+            } else if (newSpeed > 200) {
+                systemData.currentSpeed = 200;
+            } else {
+                systemData.currentSpeed = newSpeed;
+            }
+            
+            updateDisplay();
+            
+            // 添加到系统日志
+            addLogItem('info', `车速调整：${change > 0 ? '加速' : '减速'} ${Math.abs(change)} km/h，当前速度 ${systemData.currentSpeed} km/h`);
+        }
+        
+        // 设置自动速度
+        function setAutoSpeed() {
+            // 根据安全速度自动设置速度（安全速度的80%）
+            const targetSpeed = Math.floor(systemData.maxSafeSpeed * 0.8);
+            const change = targetSpeed - systemData.currentSpeed;
+            
+            // 模拟逐渐变化
+            const step = change > 0 ? 5 : -5;
+            const interval = setInterval(() => {
+                systemData.currentSpeed += step;
+                
+                // 检查是否到达目标
+                if ((step > 0 && systemData.currentSpeed >= targetSpeed) || 
+                    (step < 0 && systemData.currentSpeed <= targetSpeed)) {
+                    systemData.currentSpeed = targetSpeed;
+                    clearInterval(interval);
+                }
+                
+                updateDisplay();
+            }, 200);
+            
+            addLogItem('info', `自动调速：目标速度 ${targetSpeed} km/h（安全速度的80%）`);
+        }
+        
+        // 紧急制动
+        function emergencyStop() {
+            // 模拟紧急制动过程
+            const interval = setInterval(() => {
+                if (systemData.currentSpeed > 0) {
+                    systemData.currentSpeed = Math.max(0, systemData.currentSpeed - 15);
+                    updateDisplay();
+                } else {
+                    clearInterval(interval);
+                }
+            }, 200);
+            
+            addLogItem('warning', '紧急制动：车辆正在快速减速');
+        }
+        
+        // 更新安全数据
+        function updateSafetyData() {
+            // 模拟从MATLAB计算获取新数据
+            systemData.maxSafeSpeed = Math.floor(70 + Math.random() * 30); // 70-100之间的随机数
+            systemData.waterDepth = parseFloat((5 + Math.random() * 30).toFixed(1)); // 5-35之间的随机数
+            systemData.simulationLevel = Math.floor(20 + Math.random() * 80); // 20-100之间的随机数
+            
+            updateDisplay();
+            
+            // 添加到系统日志
+            addLogItem('info', `安全数据更新：最高安全速度 ${systemData.maxSafeSpeed} km/h，积水深度 ${systemData.waterDepth} mm`);
+        }
+        
+        // 显示详细信息
+        function showDetails() {
+            alert(`道路积水安全预警系统 - 详细报告\n\n` +
+                  `坑槽编号：${systemData.potholeId}\n` +
+                  `检测时间：${document.getElementById('detectionTime').textContent}\n` +
+                  `积水深度：${systemData.waterDepth.toFixed(1)} mm\n` +
+                  `路面类型：${systemData.roadType}\n` +
+                  `轮胎状态：${systemData.tireStatus}\n` +
+                  `当前车速：${systemData.currentSpeed} km/h\n` +
+                  `最高安全车速：${systemData.maxSafeSpeed} km/h\n` +
+                  `安全比例：${(systemData.currentSpeed / systemData.maxSafeSpeed * 100).toFixed(1)}%\n` +
+                  `系统状态：${systemData.systemStatus === 'safe' ? '正常' : systemData.systemStatus === 'warning' ? '警告' : '危险'}`);
+            
+            addLogItem('info', '查看详细系统报告');
+        }
+        
+        // 导出报告
+        function exportReport() {
+            addLogItem('info', '导出系统报告文件：road_safety_report.pdf');
+            alert('系统报告已导出为 PDF 文件：road_safety_report.pdf');
+        }
+        
+        // 切换警报设置
+        function toggleAlerts() {
+            addLogItem('info', '调整警报设置');
+            alert('警报设置面板已打开，可以调整报警阈值和通知方式。');
+        }
+        
+        // 添加日志项目
+        function addLogItem(type, message) {
+            const logPanel = document.getElementById('systemLog');
+            const time = new Date();
+            const timeString = `${time.getHours().toString().padStart(2, '0')}:${time.getMinutes().toString().padStart(2, '0')}:${time.getSeconds().toString().padStart(2, '0')}`;
+            
+            const logItem = document.createElement('div');
+            logItem.className = 'log-item';
+            logItem.innerHTML = `
+                <span class="log-time">${timeString}</span>
+                <span class="log-${type}">${message}</span>
+            `;
+            
+            logPanel.appendChild(logItem);
+            
+            // 保持日志数量不超过10条
+            while (logPanel.children.length > 10) {
+                logPanel.removeChild(logPanel.firstChild);
+            }
+            
+            // 滚动到底部
+            logPanel.scrollTop = logPanel.scrollHeight;
+        }
+        
+        // 开始数据模拟
+        function startDataSimulation() {
+            // 模拟随机数据变化
+            setInterval(() => {
+                // 20%的概率轻微调整速度
+                if (Math.random() < 0.2) {
+                    const change = Math.floor(Math.random() * 6) - 2; // -2 到 +3 的变化
+                    systemData.currentSpeed = Math.max(0, Math.min(200, systemData.currentSpeed + change));
+                }
+                
+                // 10%的概率轻微调整水深
+                if (Math.random() < 0.1) {
+                    const change = (Math.random() - 0.5) * 2; // -1 到 +1 的变化
+                    systemData.waterDepth = Math.max(0, systemData.waterDepth + change);
+                }
+                
+                updateDisplay();
+            }, 5000); // 每5秒更新一次
+        }
+    </script>
+</body>
+</html>
